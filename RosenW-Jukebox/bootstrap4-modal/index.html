@@ -1,0 +1,51 @@
+<html lang="en">
+  <head>
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
+  </head>
+   <body>
+    <div id="myModal" class="modal fade" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-body">
+            <p>Successfuly unsubscribed from channel</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="list-group-item offset-lg-4 offset-md-4 offset-sm-4 offset-xs-4 col-lg-4 col-md-4 col-sm-4 col-xs-4">
+      <input type="text" id='channel' placeholder="Enter Youtube Channel link" class="form-control">
+
+      <br>
+      <label for="select-global">From</label>
+      <select id="select-global">
+        <option value="week">Last Week</option>
+        <option value="month">Last Month</option>
+        <option value="year">Last Year</option>
+        <option value="all" selected>Whenever</option>
+      </select>
+      <button id='sub-btn' class='btn btn-default float-right'> Subscribe </button>
+    </ul>
+    <h2 class="col-lg-12 col-md-12 col-sm-12 col-xs-12 text-center">Channels subscribed to:</h2>
+    <ul id='channels' class='col-lg-12 col-md-12 col-sm-12 col-xs-12 text-center'>
+
+    </ul>
+    <table id="info-table" class="table table-hover">
+      <tr>
+        <th>Date</th>
+        <th>Artist</th>
+        <th>Song</th>
+        <th>Duration</th>
+        <th>Album</th>
+      </tr>
+    </table>
+  </body>
+</html>
+
+<script src="./scripts/jquery.min.js"></script>
+<script src="./scripts/bootstrap.min.js"></script>
+<script src="./scripts/asserts.js"></script>
+<script src="./scripts/jukebox.js"></script>
