@@ -59,27 +59,20 @@ async function relistChannel (channel) {
   };
   const reqLink = `https://www.googleapis.com/youtube/v3/search?${toQueryString(params)}`;
 
-  const items = [];
-  let data = await makeRequest(reqLink);
-  items.push(...data.items); // use concat
+  let videos = await getAllVideos(reqLink);
 
-  while (data.nextPageToken != null) {
-    data = await makeRequest(`${reqLink}&pageToken=${data.nextPageToken}`);
-    items.push(...data.items);
-  }
-
-  if (items.length <= 0) {
+  if (videos.length <= 0) {
     displayVideos();
     return;
   }
 
   assertPeer( // _.get (lodash)
-    isObject(items[0].snippet) &&
-    typeof items[0].snippet.channelTitle === 'string',
+    isObject(videos[0].snippet) &&
+    typeof videos[0].snippet.channelTitle === 'string',
     'Youtube responded with wrong data'
   );
 
-  saveAndDisplayVids(items); // rename items
+  saveAndDisplayVids(videos);
 }
 
 async function subscribe () {
@@ -121,15 +114,8 @@ async function subscribe () {
 
   channelTextBox.value = '';
 
-  const items = []; // make function
-  let songs = await makeRequest(reqLink);
-  items.push(...songs.items);
-
-  while (songs.nextPageToken != null) {
-    songs = await makeRequest(`${reqLink}&pageToken=${songs.nextPageToken}`);
-    items.push(...songs.items);
-  }
-  assertPeer(Array.isArray(songs.items), 'Youtube responded with wrong data');
+  let items = await getAllVideos(reqLink);
+  assertPeer(Array.isArray(items), 'Youtube responded with wrong data');
 
   if (items.length <= 0) {
     showChannels();
@@ -162,18 +148,18 @@ function saveAndDisplayVids (videos) {
     };
     const videoTitle = video.snippet.title; // remove undef
     assertPeer(videoTitle !== undefined, 'Unexpected Youtube response - video has no title');
-    const artAndSong = extractArtistsAndSongFromTitle(videoTitle); // setting song and artsts
+    const artAndSong = extractArtistsAndSongFromTitle(videoTitle);
 
     if (artAndSong === undefined ||
         typeof artAndSong === undefined ||
         artAndSong.artists.length === 0) {
-      console.log(`Didn't recognise artist and song from video: ${videoTitle}`); // add to array
+      console.log(`Didn't recognise artist and song from video: ${videoTitle}`);
       continue;
     }
 
     assertPeer(video.snippet.channelTitle !== undefined, 'Unexpected Youtube response - channel name not present');
 
-    videoObj.channel = video.snippet.channelTitle; // todo assert peer
+    videoObj.channel = video.snippet.channelTitle;
     videoObj.artists = artAndSong.artists;
     videoObj.song = artAndSong.song.trim();
 
@@ -214,7 +200,7 @@ function saveAndDisplayVids (videos) {
         const vidDate = video.snippet.publishedAt;
         videoObj.date = vidDate;
 
-        if (videoObj.artists.length > 0 && videoObj.song.length > 0) { // pushing valid data to array
+        if (videoObj.artists.length > 0 && videoObj.song.length > 0) {
           allVids.push(videoObj);
           allVids = allVids.sort((a, b) => { return new Date(b.date) - new Date(a.date); });
           updateLocalStorage();
@@ -289,27 +275,20 @@ function showChannels () {
     filterLabel.setAttribute('class', 'pull-left');
     filterLabel.innerHTML = 'Filter by date: ';
 
-    const lastWeekOpt = document.createElement('option');
-    lastWeekOpt.setAttribute('value', 'week');
-    lastWeekOpt.innerHTML = 'Last Week';
+    options = {
+      nothing: '',
+      week: 'Last Week',
+      month: 'Last Month',
+      year: 'Last Year',
+      all: 'Whenever'
+    };
 
-    const lastMonthOpt = document.createElement('option');
-    lastMonthOpt.setAttribute('value', 'month');
-    lastMonthOpt.innerHTML = 'Last Month';
-
-    const lastYearOpt = document.createElement('option');
-    lastYearOpt.setAttribute('value', 'year');
-    lastYearOpt.innerHTML = 'Last Year';
-
-    const wheneverOpt = document.createElement('option');
-    wheneverOpt.setAttribute('value', 'all');
-    wheneverOpt.setAttribute('selected', 'true');
-    wheneverOpt.innerHTML = 'Whenever'; // make func
-
-    filterElement.appendChild(lastWeekOpt);
-    filterElement.appendChild(lastMonthOpt);
-    filterElement.appendChild(lastYearOpt);
-    filterElement.appendChild(wheneverOpt);
+    for (const key of Object.keys(options)) {
+      const tempOpt = document.createElement('option');
+      tempOpt.setAttribute('value', key);
+      tempOpt.innerHTML = options[key];
+      filterElement.appendChild(tempOpt);
+    }
 
     pElement.appendChild(aElement);
     liElement.appendChild(pElement);
@@ -319,6 +298,18 @@ function showChannels () {
     liElement.appendChild(unsubBtn);
     channelsElement.appendChild(liElement);
   }
+}
+
+function makeOptionElements (opts) {
+  const keys = Object.keys(opts);
+  const optionElements = [];
+  for(const key of keys){
+    const tempOpt = document.createElement('option');
+    tempOpt.setAttribute('value', key);
+    tempOpt.innerHTML = opts[key];
+    optionElements.push(tempOpt);
+  }
+  return optionElements;
 }
 
 function updateLocalStorage () {
@@ -361,31 +352,27 @@ function cleanTable () {
   table.innerHTML = `<tr>${headers}</tr>`;
 }
 
-function addVideoToTable (video) { // datafication
+function addVideoToTable (video) {
+  const cellValues = {
+    artists: video.artists.join(', '),
+    song: video.song,
+    album: video.album,
+    duration: video.duration,
+    date: video.date.substr(0, 10)
+  }
+
   const row = table.insertRow(-1);
 
-  const dateCell = row.insertCell(0);
-  const artistCell = row.insertCell(1);
-  const songCell = row.insertCell(2);
-  const durationCell = row.insertCell(3);
-  const albumCell = row.insertCell(4);
-
-  const artistText = document.createTextNode(video.artists.join(', '));
-  const songText = document.createTextNode(video.song);
-  const albumText = document.createTextNode(video.album);
-  const durationText = document.createTextNode(video.duration);
-  const dateText = document.createTextNode(video.date.substr(0, 10));
-
-  artistCell.appendChild(artistText);
-  songCell.appendChild(songText);
-  albumCell.appendChild(albumText);
-  durationCell.appendChild(durationText);
-  dateCell.appendChild(dateText);
+  let index = 0;
+  for (const key of Object.keys(cellValues)) {
+    const cell = row.insertCell(index++);
+    cell.appendChild(document.createTextNode(cellValues[key]));
+  }
 }
 
-// Rework function
 function extractArtistsAndSongFromTitle (title) {
   const titleTokens = title.split(' - ');
+  let featWords = ['vs', '&', 'ft\.', 'feat\.']; // complete
 
   const artistRegex = /(?<=vs|&|ft\.|feat\.|^)(.*?)(?=vs|&|ft\.|feat\.|$| - )/gi; // make code generated regex with []
   const songRegex = /(?<= - ).*?(?=vs|&|ft\.|feat\.|$|\(|\[)/gi;
@@ -416,7 +403,6 @@ function msToMinutesAndSeconds (ms) {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
-// fetch wrapper
 async function makeRequest (link, options) {
   try {
     const response = await fetch(link, options);
@@ -431,9 +417,8 @@ async function makeRequest (link, options) {
   }
 }
 
-function toQueryString (params) { // check type
+function toQueryString (params) {
   assert(typeof params === 'object', 'non-hash passed to function');
-  // assert(params)
   const result = [];
 
   for (const param of Object.keys(params)) {
@@ -461,8 +446,10 @@ function getDateByFilter (channel) {
     returnDate = getLastMonth();
   } else if (value === 'year') {
     returnDate = getLastYear();
-  } else {
+  } else if (value === 'all') {
     returnDate = 0;
+  } else {
+    return new Date().toISOString();
   }
 
   return new Date(returnDate).toISOString();
@@ -474,4 +461,18 @@ function handlePeerError (err) {
 
 function handleUserError (err) {
   console.log(err);
+}
+
+async function getAllVideos (link) {
+  let videos = [];
+
+  let data = await makeRequest(link);
+  videos = videos.concat(data.items);
+
+  while (data.nextPageToken != null) {
+    data = await makeRequest(`${link}&pageToken=${data.nextPageToken}`);
+    videos = videos.concat(data.items);
+  }
+
+  return videos;
 }
